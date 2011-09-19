@@ -4,10 +4,38 @@ import re
 def join_list(l):
     return ", ".join(map(lambda s: str(s),l))
 
+def weak_contains(items, target):
+    for item in items:
+        if weak_match(item, target):
+            return True
+    return False
+
+def weak_find(items, target):
+    for item in items:
+        if weak_match(item, target):
+            return item
+    return None
+
+# Matches a grounded condition if it has the same name and literals
+# but ignores the truth value
+def weak_match(ground1, ground2):
+    if ground1.predicate != ground2.predicate:
+        return False
+    if len(ground1.literals) != len(ground2.literals):
+        return False
+    for i, j in zip(ground1.literals, ground2.literals):
+        if i != j:
+            return False
+    return True
+
+# Matches a grounded conditions if it is a weak match and is the same truth value
+def strong_match(ground1, ground2):
+    return ground1.truth == ground2.truth and weak_match(ground1, ground2)
+
 class World:
     def __init__(self):
         self.state = dict()
-        self.goals = dict()
+        self.goals = set()
         self.known_literals = set()
         self.actions = dict()
     def is_true(self, predicate, literals):
@@ -23,19 +51,19 @@ class World:
     def set_false(self, predicate, literals):
         if predicate in self.state:
             self.state[predicate].remove(literals)
-    def add_goal(self, predicate, literals):
-        self.add_goal(predicate, literals, True)
-    def add_goal(self, predicate, literals, truth):
-        if predicate not in self.goals:
-            self.goals[predicate] = set()
+    def add_goal(self, predicate, literals, truth=True):
         g = GroundedCondition(predicate, literals, truth)
-        self.goals[predicate].add(g)
+        self.goals.add(g)
     def add_literal(self, literal):
         self.known_literals.add(literal)
     def add_action(self, action):
         if action.name not in self.actions:
             self.actions[action.name] = action
-    
+    def goal_reached(self):
+        for g in self.goals:
+            if not g.reached(self):
+                return False
+        return True
 
 class Condition:
     def __init__(self, predicate, params, truth=True):
@@ -59,12 +87,12 @@ class Condition:
         return "{0}({1})".format(name, join_list(self.params))
 
 class GroundedCondition:
-    def __init__(self, predicate, literals, truth):
+    def __init__(self, predicate, literals, truth=True):
         self.predicate = predicate
         self.literals = literals
         self.truth = truth
 
-    def reached(world):
+    def reached(self, world):
         return world.is_true(self.predicate, self.literals) == self.truth
 
     def __str__(self):
@@ -108,8 +136,22 @@ class GroundedAction:
         self.literals = literals
         self.pre = pre
         self.post = post
+        # If the precondition specifies some requirement that is not changed in the post condition,
+        # then we add that together with the post conditions and call it the "complete" post conditions
+        self.complete_post = list(post)
+        for p in pre:
+            if not weak_contains(self.complete_post, p):
+                self.complete_post.append(p)
     def __str__(self):
         return "{0}({1})\nPre:{2}\nPost: {3}".format(self.action.name, join_list(self.literals), join_list(self.pre), join_list(self.post))
+    def changes_to_state(self, world):
+        count = 0
+        for p in self.post:
+            if not p.reached(world):
+                count += 1
+        return count
+    
+    
 
 
 w = World()
@@ -308,20 +350,79 @@ for k, v in w.actions.iteritems():
     v.generate_groundings(w)
     v.print_grounds()
     print ""
-    # Parse input
 
-        # Create goals
+print "Goal solved? {0}".format(w.goal_reached())
 
-        # Create actions
-
-        # Create preconditions
-
-        # Create post conditions
-
-        # Create start state
-
-        # Create goal state
-
-# Ground predicate clauses
 
 # Solve
+def solve(world):
+    plan = []
+    preconds = []
+    subgoals = list(world.goals)
+    return solve_helper(world, subgoals, preconds, plan)
+
+def solve_helper(world, subgoals, preconds, plan):
+    # Check if we're at the goal state
+    if world.goal_reached():
+        return plan
+
+    # Find a goal that we have not currently reached
+    for g in subgoals:
+        # if we already reached this part of the goal, then do nothing
+        if g.reached(world):
+            continue
+        
+        print "Looking for subgoal: {0}".format(str(g))
+
+        # get all the grounds which will reach the goal
+        candidates = get_possible_grounds(world, g)
+"""
+        print "Candidates:"
+        for c in candidates:
+            print c
+            print ""
+"""
+        # remove any that would alter the state to violate our preconditions
+        # for our subsequent actions. This happens in one of two ways:
+        # 1) You can have a postcondition which will directly violate a future precondition
+        # 2) You can have a precondition which is not altered in the postcondition and
+        #    thus will directly violate a future precondition
+        candidates = filter_grounded_actions(candidates, preconds)
+
+        # sort them by the minimum distance from the intial state
+
+        # try each one in order, with the precondition as the new subgoal
+
+# Gets all grounded actions which have a post condition that includes the goal
+def get_possible_grounds(world, goal):
+    results = []
+    for key,action in world.actions.iteritems():
+        for ground in action.grounds:
+            for p in ground.post:
+                if strong_match(p, goal):
+                    results.append(ground)
+                    break
+    return results
+
+def filter_grounded_actions(grounds, preconds):
+    results = []
+    # Get the grounded actions for this action
+    for ga in grounds:
+        if valid_subgoal_action(ga, preconds):
+            results.append(ga)
+    return results
+
+# Checks if we will make the goal unreachable by using this grounded action
+def valid_subgoal_action(grounded_action, preconds):
+    # Look at each of our required preconditions for the next action
+    for pre in preconds:
+        post = weak_find(grounded_action.complete_post, pre)
+        if post != None and post.truth != pre.truth:
+            return False
+    return True
+
+
+solve(w)
+
+
+

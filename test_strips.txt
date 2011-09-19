@@ -25,4 +25,4 @@ Actions:
                // take the bananas
                TakeBananas(Location)
                Preconditions:  At(Location), BananasAt(Location), Level(high)
-               Postconditions: Have(bananas)
+               Postconditions: Have(Bananas)

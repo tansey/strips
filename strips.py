@@ -152,8 +152,6 @@ class GroundedAction:
     def simple_str(self):
         return "{0}({1})".format(self.action.name, join_list(self.literals))
 
-w = World()
-
 class ParseState:
     INITIAL=1
     GOAL=2
@@ -162,172 +160,6 @@ class ParseState:
     ACTION_PRE=5
     ACTION_POST=6
 
-
-predicateRegex = re.compile('(!?[A-Z][a-zA-Z_]*) *\( *([a-zA-Z0-9_, ]+) *\)')
-initialStateRegex = re.compile('init(ial state)?:', re.IGNORECASE)
-goalStateRegex = re.compile('goal( state)?:', re.IGNORECASE)
-actionStateRegex = re.compile('actions:', re.IGNORECASE)
-precondRegex = re.compile('pre(conditions)?:', re.IGNORECASE)
-postcondRegex = re.compile('post(conditions)?:', re.IGNORECASE)
-pstate = ParseState.INITIAL
-cur_action = None
-
-# Read file
-for line in fileinput.input():
-    if line.strip() == "" or line.strip()[:2] == "//":
-        continue
-
-    if pstate == ParseState.INITIAL:
-        # Get initial state
-        m = initialStateRegex.match(line)
-
-        # Check the declaring syntax
-        if m is None:
-            raise Exception("Initial state not specified correctly. Line should start with 'Initial state:' or 'init:' but was: " + line)
-
-        # Get the initial state
-        preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
-
-        for p in preds:
-            # get the name of the predicate
-            name = p[0]
-            literals = tuple([s.strip() for s in p[1].split(",")])
-            for literal in literals:
-                w.add_literal(literal)
-
-            # Note that this is a closed-world assumption, so the only reason to have a negative initial
-            # state is if you have some literals that need to be declared
-            if name[0] == '!':
-                name = name[1:]
-                w.set_false(name, literals)
-            else:
-                w.set_true(name, literals)
-
-        pstate = ParseState.GOAL
-
-    elif pstate == ParseState.GOAL:
-        # Get goal state declaration
-        m = goalStateRegex.match(line)
-
-        # Check the declaring syntax
-        if m is None:
-            raise Exception("Goal state not specified correctly. Line should start with 'Goal state:' or 'goal:' but line was: " + line)
-
-        # Get the goal state
-        preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
-
-        for p in preds:
-            # get the name of the predicate
-            name = p[0]
-            literals = tuple([s.strip() for s in p[1].split(",")])
-            for literal in literals:
-                w.add_literal(literal)
-
-            # Check if this is a negated predicate
-            truth = name[0] != '!'
-
-            # If it's negated, update the name
-            if not truth:
-                name = name[1:]
-
-            # Add the goal condition
-            w.add_goal(name, literals, truth)
-
-        pstate = ParseState.ACTIONS
-    elif pstate == ParseState.ACTIONS:
-        # Get goal state declaration
-        m = actionStateRegex.match(line)
-
-        # Check the declaring syntax
-        if m is None:
-            raise Exception("Actions not specified correctly. Line should start with 'Actions:' but line was: " + line)
-
-        pstate = ParseState.ACTION_DECLARATION
-    elif pstate == ParseState.ACTION_DECLARATION:
-
-        # Action declarations look just like predicate declarations
-        m = predicateRegex.match(line.strip())
-
-        if m is None:
-            raise Exception("Action not specified correctly. Expected action declaration in form Name(Param1, ...) but was: " + line)
-
-        name = m.group(1)
-        params = tuple([s.strip() for s in m.group(2).split(",")])
-
-        cur_action = Action(name, params, [], [])
-
-        pstate = ParseState.ACTION_PRE
-    elif pstate == ParseState.ACTION_PRE:
-
-        # Precondition declarations look just like state declarations but with a different starting syntax
-        m = precondRegex.match(line.strip())
-
-        # Check the declaring syntax
-        if m is None:
-            raise Exception("Preconditions not specified correctly. Line should start with 'Preconditions:' or 'pre:' but was: " + line)
-
-        # Get the preconditions
-        preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
-
-        for p in preds:
-            # get the name of the predicate
-            name = p[0]
-
-            params = tuple([s.strip() for s in p[1].split(",")])
-
-            # conditions can have literals that have yet to be declared
-            for p in params:
-                if p not in cur_action.params:
-                    w.add_literal(p)
-
-            # Check if this is a negated predicate
-            truth = name[0] != '!'
-
-            # If it's negated, update the name
-            if not truth:
-                name = name[1:]
-
-            cur_action.pre.append(Condition(name, params, truth))
-
-        pstate = ParseState.ACTION_POST
-    elif pstate == ParseState.ACTION_POST:
-        # Precondition declarations look just like state declarations but with a different starting syntax
-        m = postcondRegex.match(line.strip())
-
-        # Check the declaring syntax
-        if m is None:
-            raise Exception("Postconditions not specified correctly. Line should start with 'Postconditions:' or 'post:' but was: " +line)
-
-        # Get the postconditions
-        preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
-
-        for p in preds:
-            # get the name of the predicate
-            name = p[0]
-
-            params = tuple([s.strip() for s in p[1].split(",")])
-
-            # conditions can have literals that have yet to be declared
-            for p in params:
-                if p not in cur_action.params:
-                    w.add_literal(p)
-
-            # Check if this is a negated predicate
-            truth = name[0] != '!'
-
-            # If it's negated, update the name
-            if not truth:
-                name = name[1:]
-
-            cur_action.post.append(Condition(name, params, truth))
-
-        # Add this action to the world
-        w.add_action(cur_action)
-
-        pstate = ParseState.ACTION_DECLARATION
-
-for k, v in w.actions.iteritems():
-    v.generate_groundings(w)
 
 
 # Solve
@@ -465,13 +297,181 @@ def merge_goals(world, grounded_action, goals):
 
     return result
 
-# Did someone start us at the goal?
-already_solved = w.goal_reached()
-print "Goal already solved? {0}".format(already_solved)
+def __main__():
+    w = World()
+    predicateRegex = re.compile('(!?[A-Z][a-zA-Z_]*) *\( *([a-zA-Z0-9_, ]+) *\)')
+    initialStateRegex = re.compile('init(ial state)?:', re.IGNORECASE)
+    goalStateRegex = re.compile('goal( state)?:', re.IGNORECASE)
+    actionStateRegex = re.compile('actions:', re.IGNORECASE)
+    precondRegex = re.compile('pre(conditions)?:', re.IGNORECASE)
+    postcondRegex = re.compile('post(conditions)?:', re.IGNORECASE)
+    pstate = ParseState.INITIAL
+    cur_action = None
 
-if not already_solved:
-    solution = solve(w)
-    if solution is None:
-        print "No solution found :("
-    else:
-        print "Solved! Plan: {0}".format(" -> ".join(reversed([x.simple_str() for x in solution])))
+    # Read file
+    for line in fileinput.input():
+        if line.strip() == "" or line.strip()[:2] == "//":
+            continue
+
+        if pstate == ParseState.INITIAL:
+            # Get initial state
+            m = initialStateRegex.match(line)
+
+            # Check the declaring syntax
+            if m is None:
+                raise Exception("Initial state not specified correctly. Line should start with 'Initial state:' or 'init:' but was: " + line)
+
+            # Get the initial state
+            preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
+
+            for p in preds:
+                # get the name of the predicate
+                name = p[0]
+                literals = tuple([s.strip() for s in p[1].split(",")])
+                for literal in literals:
+                    w.add_literal(literal)
+
+                # Note that this is a closed-world assumption, so the only reason to have a negative initial
+                # state is if you have some literals that need to be declared
+                if name[0] == '!':
+                    name = name[1:]
+                    w.set_false(name, literals)
+                else:
+                    w.set_true(name, literals)
+
+            pstate = ParseState.GOAL
+
+        elif pstate == ParseState.GOAL:
+            # Get goal state declaration
+            m = goalStateRegex.match(line)
+
+            # Check the declaring syntax
+            if m is None:
+                raise Exception("Goal state not specified correctly. Line should start with 'Goal state:' or 'goal:' but line was: " + line)
+
+            # Get the goal state
+            preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
+
+            for p in preds:
+                # get the name of the predicate
+                name = p[0]
+                literals = tuple([s.strip() for s in p[1].split(",")])
+                for literal in literals:
+                    w.add_literal(literal)
+
+                # Check if this is a negated predicate
+                truth = name[0] != '!'
+
+                # If it's negated, update the name
+                if not truth:
+                    name = name[1:]
+
+                # Add the goal condition
+                w.add_goal(name, literals, truth)
+
+            pstate = ParseState.ACTIONS
+        elif pstate == ParseState.ACTIONS:
+            # Get goal state declaration
+            m = actionStateRegex.match(line)
+
+            # Check the declaring syntax
+            if m is None:
+                raise Exception("Actions not specified correctly. Line should start with 'Actions:' but line was: " + line)
+
+            pstate = ParseState.ACTION_DECLARATION
+        elif pstate == ParseState.ACTION_DECLARATION:
+
+            # Action declarations look just like predicate declarations
+            m = predicateRegex.match(line.strip())
+
+            if m is None:
+                raise Exception("Action not specified correctly. Expected action declaration in form Name(Param1, ...) but was: " + line)
+
+            name = m.group(1)
+            params = tuple([s.strip() for s in m.group(2).split(",")])
+
+            cur_action = Action(name, params, [], [])
+
+            pstate = ParseState.ACTION_PRE
+        elif pstate == ParseState.ACTION_PRE:
+
+            # Precondition declarations look just like state declarations but with a different starting syntax
+            m = precondRegex.match(line.strip())
+
+            # Check the declaring syntax
+            if m is None:
+                raise Exception("Preconditions not specified correctly. Line should start with 'Preconditions:' or 'pre:' but was: " + line)
+
+            # Get the preconditions
+            preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
+
+            for p in preds:
+                # get the name of the predicate
+                name = p[0]
+
+                params = tuple([s.strip() for s in p[1].split(",")])
+
+                # conditions can have literals that have yet to be declared
+                for p in params:
+                    if p not in cur_action.params:
+                        w.add_literal(p)
+
+                # Check if this is a negated predicate
+                truth = name[0] != '!'
+
+                # If it's negated, update the name
+                if not truth:
+                    name = name[1:]
+
+                cur_action.pre.append(Condition(name, params, truth))
+
+            pstate = ParseState.ACTION_POST
+        elif pstate == ParseState.ACTION_POST:
+            # Precondition declarations look just like state declarations but with a different starting syntax
+            m = postcondRegex.match(line.strip())
+
+            # Check the declaring syntax
+            if m is None:
+                raise Exception("Postconditions not specified correctly. Line should start with 'Postconditions:' or 'post:' but was: " +line)
+
+            # Get the postconditions
+            preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
+
+            for p in preds:
+                # get the name of the predicate
+                name = p[0]
+
+                params = tuple([s.strip() for s in p[1].split(",")])
+
+                # conditions can have literals that have yet to be declared
+                for p in params:
+                    if p not in cur_action.params:
+                        w.add_literal(p)
+
+                # Check if this is a negated predicate
+                truth = name[0] != '!'
+
+                # If it's negated, update the name
+                if not truth:
+                    name = name[1:]
+
+                cur_action.post.append(Condition(name, params, truth))
+
+            # Add this action to the world
+            w.add_action(cur_action)
+
+            pstate = ParseState.ACTION_DECLARATION
+
+    for k, v in w.actions.iteritems():
+        v.generate_groundings(w)
+
+    # Did someone start us at the goal?
+    already_solved = w.goal_reached()
+    print "Goal already solved? {0}".format(already_solved)
+
+    if not already_solved:
+        solution = solve(w)
+        if solution is None:
+            print "No solution found :("
+        else:
+            print "Solved! Plan: {0}".format(" -> ".join(reversed([x.simple_str() for x in solution])))

@@ -161,22 +161,32 @@ class ParseState:
     ACTION_PRE=5
     ACTION_POST=6
 
-
+debug = False
 
 # Solve
 def solve(world):
-    plan = []
-    preconds = []
-    subgoals = list(world.goals)
-    return solve_helper(world, subgoals, preconds, plan)
+    for depth in range(1,11):
+        print "Trying plans of length {0}".format(depth)
+        plan = []
+        preconds = []
+        subgoals = list(world.goals)
+        result = solve_helper(world, subgoals, preconds, plan, depth)
+        if result != None:
+            return result
+    return None
 
-def solve_helper(world, subgoals, preconds, plan):
+def solve_helper(world, subgoals, preconds, plan, max_depth):
     # Check if we're at the goal state
     if len(subgoals) == 0:
         return plan
 
     if len(plan) > 0 and state_distance(world,preconds) == 0:
+        print "State distance 0!"
         return plan
+
+    # maximum plan length is 10
+    if len(plan) >= max_depth:
+        return None
 
     padding = ""
     for p in plan:
@@ -215,9 +225,14 @@ def solve_helper(world, subgoals, preconds, plan):
 
             # add the candidate to the list of possibilities
             plan.append(candidate)
+            
+            if debug:
+                print padding + str(candidate).replace("\n", "\n" + padding)
+                print padding + "Subgoals: {0}".format(", ".join([str(x) for x in candgoals]))
+                print ""
 
             # recursive descent. try adding another subgoal and see if it gets us farther
-            result = solve_helper(world, candgoals, candpre, plan)
+            result = solve_helper(world, candgoals, candpre, plan, max_depth)
 
             # if we found a working plan, then return it
             if result != None:
@@ -225,6 +240,8 @@ def solve_helper(world, subgoals, preconds, plan):
 
             # if the candidate did not work, remove it and try the next guy
             plan.pop()
+        
+        return None
 
 
 
@@ -261,6 +278,8 @@ def valid_subgoal_action(grounded_action, preconds):
 def state_distance(world, preconds):
     count = 0
     for p in preconds:
+        if debug:
+            print str(p)
         if not p.reached(world):
             count += 1
     return count
@@ -485,8 +504,8 @@ def main():
             print "No solution found :("
         else:
             print "Solved! Plan: {0}".format(" -> ".join(reversed([x.simple_str() for x in solution])))
-            from show_strips import show_solution
-            show_solution(solution)
+            #from show_strips import show_solution
+            #show_solution(solution)
 
 if __name__ == "__main__":
     main()

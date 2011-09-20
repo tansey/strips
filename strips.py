@@ -178,7 +178,7 @@ for line in fileinput.input():
         m = initialStateRegex.match(line)
 
         # Check the declaring syntax
-        if m == None:
+        if m is None:
             raise Exception("Initial state not specified correctly. Line should start with 'Initial state:' or 'init:' but was: " + line)
 
         # Get the initial state
@@ -206,7 +206,7 @@ for line in fileinput.input():
         m = goalStateRegex.match(line)
 
         # Check the declaring syntax
-        if m == None:
+        if m is None:
             raise Exception("Goal state not specified correctly. Line should start with 'Goal state:' or 'goal:' but line was: " + line)
 
         # Get the goal state
@@ -235,7 +235,7 @@ for line in fileinput.input():
         m = actionStateRegex.match(line)
 
         # Check the declaring syntax
-        if m == None:
+        if m is None:
             raise Exception("Actions not specified correctly. Line should start with 'Actions:' but line was: " + line)
 
         pstate = ParseState.ACTION_DECLARATION
@@ -244,7 +244,7 @@ for line in fileinput.input():
         # Action declarations look just like predicate declarations
         m = predicateRegex.match(line.strip())
 
-        if m == None:
+        if m is None:
             raise Exception("Action not specified correctly. Expected action declaration in form Name(Param1, ...) but was: " + line)
 
         name = m.group(1)
@@ -259,7 +259,7 @@ for line in fileinput.input():
         m = precondRegex.match(line.strip())
 
         # Check the declaring syntax
-        if m == None:
+        if m is None:
             raise Exception("Preconditions not specified correctly. Line should start with 'Preconditions:' or 'pre:' but was: " + line)
 
         # Get the preconditions
@@ -291,7 +291,7 @@ for line in fileinput.input():
         m = postcondRegex.match(line.strip())
 
         # Check the declaring syntax
-        if m == None:
+        if m is None:
             raise Exception("Postconditions not specified correctly. Line should start with 'Postconditions:' or 'post:' but was: " +line)
 
         # Get the postconditions
@@ -456,7 +456,7 @@ def merge_goals(world, grounded_action, goals):
     # add new goals for each precondition to the action
     for p in grounded_action.pre:
         m = weak_find(result, p)
-        if m == None and world.is_true(p.predicate, p.literals) != p.truth:
+        if m is None and world.is_true(p.predicate, p.literals) != p.truth:
             result.append(p)
 
     return result
@@ -467,7 +467,7 @@ print "Goal already solved? {0}".format(already_solved)
 
 if not already_solved:
     solution = solve(w)
-    if solution == None:
+    if solution is None:
         print "No solution found :("
     else:
         print "Solved! Plan: {0}".format(" -> ".join(reversed(map(lambda x: x.simple_str(),solution))))

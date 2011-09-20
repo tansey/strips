@@ -2,7 +2,7 @@ import fileinput
 import re
 
 def join_list(l):
-    return ", ".join(map(lambda s: str(s),l))
+    return ", ".join([str(s) for s in l])
 
 def weak_contains(items, target):
     for item in items:
@@ -118,8 +118,8 @@ class Action:
     def groundings_helper(self, all_literals, cur_literals, g):
         if len(cur_literals) == len(self.params):
             args_map = dict(zip(self.params, cur_literals))
-            grounded_pre = map(lambda p: p.ground(args_map), self.pre)
-            grounded_post = map(lambda p: p.ground(args_map), self.post)
+            grounded_pre = [p.ground(args_map) for p in self.pre]
+            grounded_post = [p.ground(args_map) for p in self.post]
             g.append(GroundedAction(self, cur_literals, grounded_pre, grounded_post))
             return
         for literal in all_literals:
@@ -191,7 +191,7 @@ for line in fileinput.input():
         for p in preds:
             # get the name of the predicate
             name = p[0]
-            literals = tuple(map(lambda s: s.strip(), p[1].split(",")))
+            literals = tuple([s.strip() for s in p[1].split(",")])
             for literal in literals:
                 w.add_literal(literal)
 
@@ -219,7 +219,7 @@ for line in fileinput.input():
         for p in preds:
             # get the name of the predicate
             name = p[0]
-            literals = tuple(map(lambda s: s.strip(), p[1].split(",")))
+            literals = tuple([s.strip() for s in p[1].split(",")])
             for literal in literals:
                 w.add_literal(literal)
 
@@ -252,7 +252,7 @@ for line in fileinput.input():
             raise Exception("Action not specified correctly. Expected action declaration in form Name(Param1, ...) but was: " + line)
 
         name = m.group(1)
-        params = tuple(map(lambda s: s.strip(), m.group(2).split(",")))
+        params = tuple([s.strip() for s in m.group(2).split(",")])
 
         cur_action = Action(name, params, [], [])
 
@@ -273,7 +273,7 @@ for line in fileinput.input():
             # get the name of the predicate
             name = p[0]
 
-            params = tuple(map(lambda s: s.strip(), p[1].split(",")))
+            params = tuple([s.strip() for s in p[1].split(",")])
 
             # conditions can have literals that have yet to be declared
             for p in params:
@@ -305,7 +305,7 @@ for line in fileinput.input():
             # get the name of the predicate
             name = p[0]
 
-            params = tuple(map(lambda s: s.strip(), p[1].split(",")))
+            params = tuple([s.strip() for s in p[1].split(",")])
 
             # conditions can have literals that have yet to be declared
             for p in params:
@@ -474,4 +474,4 @@ if not already_solved:
     if solution is None:
         print "No solution found :("
     else:
-        print "Solved! Plan: {0}".format(" -> ".join(reversed(map(lambda x: x.simple_str(),solution))))
+        print "Solved! Plan: {0}".format(" -> ".join(reversed([x.simple_str() for x in solution])))

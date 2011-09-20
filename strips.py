@@ -485,6 +485,8 @@ def main():
             print "No solution found :("
         else:
             print "Solved! Plan: {0}".format(" -> ".join(reversed([x.simple_str() for x in solution])))
+            from show_strips import show_solution
+            show_solution(solution)
 
 if __name__ == "__main__":
     main()

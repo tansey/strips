@@ -297,7 +297,7 @@ def merge_goals(world, grounded_action, goals):
 
     return result
 
-def __main__():
+def main():
     w = World()
     predicateRegex = re.compile('(!?[A-Z][a-zA-Z_]*) *\( *([a-zA-Z0-9_, ]+) *\)')
     initialStateRegex = re.compile('init(ial state)?:', re.IGNORECASE)
@@ -475,3 +475,6 @@ def __main__():
             print "No solution found :("
         else:
             print "Solved! Plan: {0}".format(" -> ".join(reversed([x.simple_str() for x in solution])))
+
+if __name__ == "__main__":
+    main()

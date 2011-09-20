@@ -150,18 +150,6 @@ class GroundedAction:
 
 w = World()
 
-"""
-w.add_literal("a")
-w.add_literal(5)
-w.add_literal(4)
-w.add_literal("foo")
-precond = Condition("cond", ("a", "P1"), True)
-postcond = Condition("cond2", ("P1", "b", "P2"))
-a = Action("great", ["P1", "P2"], [precond], [postcond])
-a.generate_groundings(w)
-print a.print_grounds()
-"""
-
 class ParseState:
     INITIAL=1
     GOAL=2
@@ -211,7 +199,6 @@ for line in fileinput.input():
             else:
                 w.set_true(name, literals)
             
-            print "INITIAL PREDICATE={0} LITERALS={1}".format(name, literals)
         pstate = ParseState.GOAL
 
     elif pstate == ParseState.GOAL:
@@ -242,8 +229,6 @@ for line in fileinput.input():
             # Add the goal condition
             w.add_goal(name, literals, truth)
 
-            print "GOAL PREDICATE={0} LITERALS={1} TRUTH={2}".format(name, literals, truth)
-        
         pstate = ParseState.ACTIONS
     elif pstate == ParseState.ACTIONS:
         # Get goal state declaration
@@ -338,15 +323,8 @@ for line in fileinput.input():
         pstate = ParseState.ACTION_DECLARATION
 
 for k, v in w.actions.iteritems():
-    #print v
-    #print "Groundings"
     v.generate_groundings(w)
-    #v.print_grounds()
-    #print ""
-
-
-print "Goal solved? {0}".format(w.goal_reached())
-
+    
 
 # Solve
 def solve(world):
@@ -360,29 +338,22 @@ def solve_helper(world, subgoals, preconds, plan):
     if len(subgoals) == 0:
         return plan
 
+    if len(plan) > 0 and state_distance(world,preconds) == 0:
+        return plan
+
     padding = ""
     for p in plan:
         padding = padding + " + "
-
-    if len(plan) == 7:
-        return None
 
     # Find a goal that we have not currently reached
     for g in subgoals:
         # if we already reached this part of the goal, then do nothing
         if g.reached(world):
             continue
-        
-        print padding + "Looking for subgoal: {0}".format(str(g))
 
         # get all the grounds which will reach the goal
         candidates = get_possible_grounds(world, g)
-        """
-        print "Candidates:"
-        for c in candidates:
-            print c
-            print ""
-        """
+        
         # remove any that would alter the state to violate our preconditions
         # for our subsequent actions. This happens in one of two ways:
         # 1) You can have a postcondition which will directly violate a future precondition
@@ -393,29 +364,22 @@ def solve_helper(world, subgoals, preconds, plan):
         # if we have not reached the goal state and we have no where that can help get us there
         # then we need to back up and try a new plan
         if len(candidates) == 0:
-            print padding + "No suitable candidates. Backing up..."
-            print ""
             return None
 
         # sort them by the minimum distance from the intial state
         # try each one in order, with the precondition as the new subgoal
         for candidate in sorted(candidates, key=lambda c: state_distance(world, c.pre)):
-            print padding + "Candidate"
-            print padding + str(candidate).replace("\n", "\n" + padding)
             
             # merge the existing preconditions with the candidate preconditions
             candpre = merge_preconditions(candidate, preconds)
 
             # determine the new set of subgoals
-            candgoals = merge_goals(candidate, subgoals)
+            candgoals = merge_goals(world, candidate, subgoals)
 
             # add the candidate to the list of possibilities
             plan.append(candidate)
-
-            print padding + "New Plan: {0}".format(" -> ".join(reversed(map(lambda x: x.simple_str(),plan))))
-            print padding + "New Goals: {0}".format(map(lambda x: str(x),candgoals))
-            print ""
-
+            
+            # recursive descent. try adding another subgoal and see if it gets us farther
             result = solve_helper(world, candgoals, candpre, plan)
 
             # if we found a working plan, then return it
@@ -480,7 +444,7 @@ def merge_preconditions(grounded_action, preconds):
             result.append(p)
     return result
 
-def merge_goals(grounded_action, goals):
+def merge_goals(world, grounded_action, goals):
     result = list(goals)
 
     # remove any goals that are reached by this action
@@ -492,12 +456,21 @@ def merge_goals(grounded_action, goals):
     # add new goals for each precondition to the action
     for p in grounded_action.pre:
         m = weak_find(result, p)
-        if m == None:
+        if m == None and world.is_true(p.predicate, p.literals) != p.truth:
             result.append(p)
 
     return result
 
-solve(w)
+# Did someone start us at the goal?
+already_solved = w.goal_reached()
+print "Goal already solved? {0}".format(already_solved)
+
+if not already_solved:
+    solution = solve(w)
+    if solution == None:
+        print "No solution found :("
+    else:
+        print "Solved! Plan: {0}".format(" -> ".join(reversed(map(lambda x: x.simple_str(),solution))))
 
 
 

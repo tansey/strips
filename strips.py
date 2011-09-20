@@ -172,15 +172,15 @@ cur_action = None
 for line in fileinput.input():
     if line.strip() == "" or line.strip()[:2] == "//":
         continue
-    
+
     if pstate == ParseState.INITIAL:
         # Get initial state
         m = initialStateRegex.match(line)
-        
+
         # Check the declaring syntax
         if m == None:
             raise Exception("Initial state not specified correctly. Line should start with 'Initial state:' or 'init:' but was: " + line)
-        
+
         # Get the initial state
         preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
 
@@ -198,7 +198,7 @@ for line in fileinput.input():
                 w.set_false(name, literals)
             else:
                 w.set_true(name, literals)
-            
+
         pstate = ParseState.GOAL
 
     elif pstate == ParseState.GOAL:
@@ -208,7 +208,7 @@ for line in fileinput.input():
         # Check the declaring syntax
         if m == None:
             raise Exception("Goal state not specified correctly. Line should start with 'Goal state:' or 'goal:' but line was: " + line)
-        
+
         # Get the goal state
         preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
 
@@ -218,14 +218,14 @@ for line in fileinput.input():
             literals = tuple(map(lambda s: s.strip(), p[1].split(",")))
             for literal in literals:
                 w.add_literal(literal)
-            
+
             # Check if this is a negated predicate
             truth = name[0] != '!'
 
             # If it's negated, update the name
             if not truth:
                 name = name[1:]
-            
+
             # Add the goal condition
             w.add_goal(name, literals, truth)
 
@@ -237,10 +237,10 @@ for line in fileinput.input():
         # Check the declaring syntax
         if m == None:
             raise Exception("Actions not specified correctly. Line should start with 'Actions:' but line was: " + line)
-        
+
         pstate = ParseState.ACTION_DECLARATION
     elif pstate == ParseState.ACTION_DECLARATION:
-        
+
         # Action declarations look just like predicate declarations
         m = predicateRegex.match(line.strip())
 
@@ -254,14 +254,14 @@ for line in fileinput.input():
 
         pstate = ParseState.ACTION_PRE
     elif pstate == ParseState.ACTION_PRE:
-        
+
         # Precondition declarations look just like state declarations but with a different starting syntax
         m = precondRegex.match(line.strip())
 
         # Check the declaring syntax
         if m == None:
             raise Exception("Preconditions not specified correctly. Line should start with 'Preconditions:' or 'pre:' but was: " + line)
-        
+
         # Get the preconditions
         preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
 
@@ -293,7 +293,7 @@ for line in fileinput.input():
         # Check the declaring syntax
         if m == None:
             raise Exception("Postconditions not specified correctly. Line should start with 'Postconditions:' or 'post:' but was: " +line)
-        
+
         # Get the postconditions
         preds = re.findall(predicateRegex, line[len(m.group(0)):].strip())
 
@@ -316,15 +316,15 @@ for line in fileinput.input():
                 name = name[1:]
 
             cur_action.post.append(Condition(name, params, truth))
-        
+
         # Add this action to the world
         w.add_action(cur_action)
-        
+
         pstate = ParseState.ACTION_DECLARATION
 
 for k, v in w.actions.iteritems():
     v.generate_groundings(w)
-    
+
 
 # Solve
 def solve(world):
@@ -353,7 +353,7 @@ def solve_helper(world, subgoals, preconds, plan):
 
         # get all the grounds which will reach the goal
         candidates = get_possible_grounds(world, g)
-        
+
         # remove any that would alter the state to violate our preconditions
         # for our subsequent actions. This happens in one of two ways:
         # 1) You can have a postcondition which will directly violate a future precondition
@@ -369,7 +369,7 @@ def solve_helper(world, subgoals, preconds, plan):
         # sort them by the minimum distance from the intial state
         # try each one in order, with the precondition as the new subgoal
         for candidate in sorted(candidates, key=lambda c: state_distance(world, c.pre)):
-            
+
             # merge the existing preconditions with the candidate preconditions
             candpre = merge_preconditions(candidate, preconds)
 
@@ -378,18 +378,18 @@ def solve_helper(world, subgoals, preconds, plan):
 
             # add the candidate to the list of possibilities
             plan.append(candidate)
-            
+
             # recursive descent. try adding another subgoal and see if it gets us farther
             result = solve_helper(world, candgoals, candpre, plan)
 
             # if we found a working plan, then return it
             if result != None:
                 return result
-            
+
             # if the candidate did not work, remove it and try the next guy
             plan.pop()
 
-        
+
 
 # Gets all grounded actions which have a post condition that includes the goal
 def get_possible_grounds(world, goal):
@@ -452,7 +452,7 @@ def merge_goals(world, grounded_action, goals):
         m = weak_find(result, p)
         if m != None and m.truth == p.truth:
             result.remove(m)
-    
+
     # add new goals for each precondition to the action
     for p in grounded_action.pre:
         m = weak_find(result, p)
@@ -471,6 +471,3 @@ if not already_solved:
         print "No solution found :("
     else:
         print "Solved! Plan: {0}".format(" -> ".join(reversed(map(lambda x: x.simple_str(),solution))))
-
-
-

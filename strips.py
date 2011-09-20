@@ -161,7 +161,7 @@ class ParseState:
     ACTION_PRE=5
     ACTION_POST=6
 
-debug = False
+debug = True
 
 # Solve
 def solve(world):
@@ -241,7 +241,6 @@ def solve_helper(world, subgoals, preconds, plan, max_depth):
             # if the candidate did not work, remove it and try the next guy
             plan.pop()
         
-        return None
 
 
 
@@ -278,8 +277,6 @@ def valid_subgoal_action(grounded_action, preconds):
 def state_distance(world, preconds):
     count = 0
     for p in preconds:
-        if debug:
-            print str(p)
         if not p.reached(world):
             count += 1
     return count

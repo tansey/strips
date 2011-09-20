@@ -16,9 +16,11 @@ def weak_find(items, target):
             return item
     return None
 
-# Matches a grounded condition if it has the same name and literals
-# but ignores the truth value
 def weak_match(ground1, ground2):
+    """
+    Matches a grounded condition if it has the same name and literals
+    but ignores the truth value
+    """
     if ground1.predicate != ground2.predicate:
         return False
     if len(ground1.literals) != len(ground2.literals):
@@ -28,8 +30,10 @@ def weak_match(ground1, ground2):
             return False
     return True
 
-# Matches a grounded conditions if it is a weak match and is the same truth value
 def strong_match(ground1, ground2):
+    """
+    Matches a grounded conditions if it is a weak match and is the same truth value
+    """
     return ground1.truth == ground2.truth and weak_match(ground1, ground2)
 
 class World:

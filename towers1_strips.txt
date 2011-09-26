@@ -1,4 +1,4 @@
-Initial state: On(Disk3, Pole1), Clear(Pole2), Clear(Pole3), Smaller(Disk3, Pole1), Clear(Disk3) Smaller(Disk3, Pole2), Smaller(Disk3, Pole3)
+Initial state: On(Disk3, Pole1), Clear(Pole2), Clear(Pole3), Smaller(Disk3, Pole1), Clear(Disk3), Smaller(Disk3, Pole2), Smaller(Disk3, Pole3)
 Goal state: On(Disk3, Pole3)
 
 Actions:
@@ -6,7 +6,3 @@ Actions:
                Move(Disk, Source, Dest)
                Preconditions: Clear(Disk), On(Disk, Source), Clear(Dest), Smaller(Disk, Dest)
                Postconditions: On(Disk, Dest), !On(Disk, Source), !Clear(Dest), Clear(Source)
-
-               //Move(Disk3, Pole1, Pole3)
-               //Preconditions: Clear(Disk3), On(Disk3, Pole1), Clear(Pole3), Smaller(Disk3, Pole3)
-               //Postconditions: On(Disk3, Pole3), !On(Disk3, Pole1), !Clear(Pole3), Clear(Pole1)

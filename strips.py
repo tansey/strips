@@ -417,7 +417,7 @@ def goal_stack_helper(world, state, goals, plan):
             raw_input("")
 
         # check if this action will smash any other subgoals
-        invalid = False
+        """invalid = False
         for post in action.post:
             f = weak_find(goals, post)
             if f and f.truth != post.truth:
@@ -427,7 +427,7 @@ def goal_stack_helper(world, state, goals, plan):
             if debug:
                 print padding + "Invalid since it will clobber another subgoal. Skipping..."
                 raw_input("")
-            continue
+            continue"""
 
         # check if there is at least 1 action for each precondition which satisfies it
         if not preconditions_reachable(world, action):

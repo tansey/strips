@@ -154,7 +154,7 @@ class GroundedAction:
             if not weak_contains(self.complete_post, p):
                 self.complete_post.append(p)
     def __str__(self):
-        return "{0}({1})\nPre:{2}\nPost: {3}".format(self.action.name, join_list(self.literals), join_list(self.pre), join_list(self.post))
+        return "{0}({1})\nPre: {2}\nPost: {3}".format(self.action.name, join_list(self.literals), join_list(self.pre), join_list(self.post))
     def simple_str(self):
         return "{0}({1})".format(self.action.name, join_list(self.literals))
 
@@ -340,15 +340,163 @@ def create_world(filename):
 
     return w
 
-debug = True
+debug = False
 
-def simple_solver(world):
+def linear_solver(world):
+    state = []
+
+    # the world state is a dictionary from predicate names to true grounded args of that predicate
+    for predicate in world.state:
+        for literals in world.state[predicate]:
+            state.append(GroundedCondition(predicate, literals, True))
+
     goals = list(world.goals)
-    preconds = []
-    initial_state = [world.state[x] for x in world.state]
+    return linear_solver_helper(world, state, goals, [])
+
+def linear_solver_helper(world, state, goals, current_plan):
+    padding = "".join(["++" for x in range(0,len(current_plan))]) + " "
     plan = []
-    result = simple_helper(goals, preconds, initial_state, plan)
-    return result
+
+    if len(goals) == 0:
+        return plan
+
+    if len(current_plan) > 10:
+        return None
+
+    i = 0
+    while i < len(goals):
+        goal = goals[i]
+
+        if debug:
+            print padding + "Current Plan: {0}".format(" -> ".join([x.simple_str() for x in current_plan]))
+            print padding + "Subgoal: {0}".format(goal)
+            print padding + "Other Goals: {0}".format(", ".join([str(x) for x in goals[i+1:]]))
+            print padding + "State: {0}".format(", ".join([str(s) for s in state]))
+            raw_input("")
+
+        if satisfied(state, goal):
+            # recurse
+            if debug:
+                raw_input(padding + "Satisfied already")
+                print ""
+            i += 1
+            continue
+        
+        possible_actions = sorted(get_possible_grounds(world, goal), key=lambda c: initial_state_distance(state, c.pre))
+
+        # otherwise, we need to find a subgoal that will get us to the goal
+        # find all the grounded actions which will satisfy the goal
+        if debug:
+            print padding + "List of possible actions that satisfy {0}:".format(goal)
+            print "\n".join([padding + x.simple_str() for x in possible_actions])
+            raw_input("")
+
+        found = False
+
+        for action in possible_actions:
+
+            if debug:
+                print padding + "Trying next action to satisfy {0}:".format(goal)
+                print padding + str(action).replace("\n", "\n" + padding)
+                raw_input("")
+
+            # check if there is at least 1 action for each precondition which satisfies it
+            if not preconditions_reachable(world, action):
+                if debug:
+                    print padding + "Some preconditions not reachable by any possible action. Skipping..."
+                    raw_input("")
+                continue
+            
+            # check if the action directly contradicts another goal
+            if contains_contradiction(goals, action):
+                if debug:
+                    print padding + "Action violates another goal state. Skipping..."
+                    raw_input("")
+                continue
+            
+            # if we can't obviously reject it as unreachable, we have to recursively descend.
+            if debug:
+                print padding + "Action cannot be trivially rejected as unreachable. Descending..."
+                raw_input("")
+
+            temp_state = list(state)
+
+            subgoals = list(action.pre)
+
+            current_plan.append(action)
+
+            solution = linear_solver_helper(world, temp_state, subgoals, current_plan)
+
+            # we were unable to find 
+            if solution is None:
+                if debug:
+                    print padding + "No solution found with this action. Skipping..."
+                current_plan.pop()
+                continue
+
+            if debug:
+                print padding + "Possible solution found!"
+                raw_input("")
+
+            
+            # update the state to incorporate the post conditions of our selected action
+            for post in action.post:
+                update_state(temp_state, post)
+            
+            """We need to check if the state deleted any of the previous goals. Three options how to handle this:
+            1) Give up
+            2) Protect it from happening by backtracking all the way (requires fine-grained tracking of states)
+            3) Re-introduce any goal which was deleted
+            We choose #3 here, because it actually solves the problem eventually"""
+            clobbered = [x for x in goals if x != goal and not satisfied(temp_state, x)]
+            if len(clobbered) > 0:
+                if debug:
+                    print padding + "Path satisfies {0} but clobbers other goals: {1}".format(goal, ", ".join([str(x) for x in clobbered]))
+                    print padding + "Re-adding the clobbered goals to the end of the list"
+                    raw_input("")
+                [goals.remove(x) for x in clobbered]
+                [goals.append(x) for x in clobbered]
+                i -= len(clobbered)
+                if debug:    
+                    print padding + "New goals: {0}".format(", ".join([str(x) for x in goals]))
+                    raw_input("")
+            
+
+            # add the subplan to the plan
+            plan.extend(solution)
+
+            # accept the temporary state as valid
+            del state[:]
+            state.extend(temp_state)
+            #state = temp_state
+
+            # add this action to the plan
+            plan.append(action)
+            
+            if debug:
+                print padding + "New State: " + ", ".join([str(x) for x in state])
+                raw_input("")
+
+            i += 1
+            found = True
+            break
+
+        if not found:
+            if debug:
+                print ""
+                raw_input("++" + padding + "No actions found to satisfy this subgoal. Backtracking...")
+                print ""
+            current_plan.pop()
+            return None
+
+    return plan
+
+def contains_contradiction(state, action):
+    for post in action.post:
+        m = weak_find(state, post)
+        if m != None and m.truth != post.truth:
+            return True
+    return False
 
 def goal_stack_solver(world):
     state = []
@@ -462,16 +610,21 @@ def goal_stack_helper(world, state, goals, plan):
         # if we found a solution
         if solution_found:
             if debug:
-                print padding + "Solution found!"
+                print padding + "Possible solution found!"
             
+            # update the state with the postconditions of the action
+            for post in action.post:
+                update_state(temp_state, post)
+
+            #if len(plan) > 1 and not foo(temp_state, plan[-2]):
+            #    plan.pop()
+            #    continue
+
             # accept the copy state as the new state
             del state[:]
             state.extend(temp_state)
             
-            # update the state with the postconditions of the action
-            for post in action.post:
-                update_state(state, post)
-            
+
             if debug:
                 print padding + "New State: " + ", ".join([str(x) for x in state])
                 print padding + "New Goals: " + ", ".join([str(x) for x in goals])
@@ -489,6 +642,12 @@ def goal_stack_helper(world, state, goals, plan):
         raw_input("++" + padding + "No actions found to satisfy this subgoal. Backtracking...")
         print ""
     return None
+
+def foo(state, action):
+    for pre in action.pre:
+        if not satisfied(state, pre):
+            return False
+    return True
 
 def initial_state_distance(state, preconds):
     count = 0
@@ -695,7 +854,7 @@ def merge_goals(world, grounded_action, goals):
     return result
 
 def print_plan(plan):
-    print "Plan: {0}".format(" -> ".join(reversed([x.simple_str() for x in plan])))
+    print "Plan: {0}".format(" -> ".join([x.simple_str() for x in plan]))
 
 
 def main():
@@ -707,7 +866,7 @@ def main():
 
     if not already_solved:
         print "Solving..."
-        solution = goal_stack_solver(w)
+        solution = linear_solver(w)
         if solution is None:
             print "No solution found :("
         else:
